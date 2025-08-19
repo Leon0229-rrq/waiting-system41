@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>じゃがバター予約</title>
+  <style>
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: #f0f2f5;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background-color: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      width: 90%;
+      max-width: 450px;
+      box-sizing: border-box;
+    }
+    h1 {
+      color: #1a73e8;
+      font-size: 2.5em;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #666;
+      font-size: 1.1em;
+      line-height: 1.6;
+    }
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+      color: #555;
+    }
+    input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 1em;
+      box-sizing: border-box;
+    }
+    .button {
+      width: 100%;
+      padding: 15px;
+      background-color: #1a73e8;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1.2em;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .button:hover {
+      background-color: #155bb5;
+    }
+    .button:disabled {
+        background-color: #b0c4de;
+        cursor: not-allowed;
+    }
+    .result {
+      margin-top: 25px;
+      padding: 20px;
+      background-color: #e8f0fe;
+      border: 1px solid #c2dcfc;
+      border-radius: 8px;
+      color: #1a73e8;
+      font-size: 1.2em;
+      display: none;
+    }
+    .reload-btn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    .reload-btn:hover {
+      background-color: #5a6268;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>じゃがバター予約</h1>
+    <p>人数を入力して予約してください。現在の待ち時間を確認できます。</p>
+
+    <div class="wait-time-section">
+      <p id="wait-time-text">現在の待ち時間を計算中...</p>
+      <button class="reload-btn" onclick="getWaitTime()">🔄 待ち時間を更新</button>
+    </div>
+
+    <form id="reservation-form">
+      <div class="form-group">
+        <label for="people">人数:</label>
+        <input type="number" id="people" name="people" min="1" max="3" required>
+      </div>
+      <button type="submit" class="button" id="reserve-button">予約する</button>
+    </form>
+
+    <div id="result" class="result"></div>
+  </div>
+
+  <script>
+    var gasUrl = 'https://script.google.com/macros/s/AKfycbwrE1UyA-WZvfKbGYbGm10Lg7ULe0ujQdOSIZj25Q4zlMNsC53wER7kruji_HkvPm82/exec'; // ★★★ GASのURLをここに貼り付ける ★★★
+    var reserveButton = document.getElementById('reserve-button');
+    var reservationForm = document.getElementById('reservation-form');
+    var resultDiv = document.getElementById('result');
+    var countdownInterval;
+
+    // ページの読み込み時に実行
+    window.onload = function() {
+      checkReservationStatus();
+      getWaitTime();
+    };
+
+    // 予約状態をローカルストレージで確認
+    function checkReservationStatus() {
+      const storedReservationNumber = localStorage.getItem('reservationNumber');
+      if (storedReservationNumber) {
+        reservationForm.style.display = 'none';
+        resultDiv.innerHTML = `✅ 予約が完了しました。<br>あなたの予約番号は <strong>${storedReservationNumber}</strong> です。`;
+        resultDiv.style.display = 'block';
+      }
+    }
+    
+    // 待ち時間のカウントダウンを開始
+    function startCountdown(initialWaitTime, estimatedTime) {
+      clearInterval(countdownInterval);
+      let remainingTime = initialWaitTime;
+      const waitTimeText = document.getElementById('wait-time-text');
+
+      // 初回の表示
+      waitTimeText.innerHTML = `現在の待ち時間は<br><strong>${remainingTime}分</strong>です。<br>だいたい<strong>${estimatedTime}</strong>頃にお越しください。`;
+
+      countdownInterval = setInterval(() => {
+        if (remainingTime > 0) {
+          remainingTime--;
+          waitTimeText.innerHTML = `現在の待ち時間は<br><strong>${remainingTime}分</strong>です。<br>だいたい<strong>${estimatedTime}</strong>頃にお越しください。`;
+        } else {
+          // 待ち時間が0になったら、タイマーを停止
+          clearInterval(countdownInterval);
+        }
+      }, 60000); // 60秒ごとにカウントダウン
+    }
+
+    // 待ち時間を取得
+    function getWaitTime() {
+      var waitTimeText = document.getElementById('wait-time-text');
+      waitTimeText.textContent = "現在の待ち時間を計算中...";
+
+      fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=getWaitTime'
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          if (data.waitTimeMinutes === 0) {
+            waitTimeText.innerHTML = "現在、待ち時間はありません。";
+            clearInterval(countdownInterval);
+          } else {
+            startCountdown(data.waitTimeMinutes, data.estimatedTime);
+          }
+        } else {
+          waitTimeText.textContent = "待ち時間の取得に失敗しました。";
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        waitTimeText.textContent = "ネットワークエラーが発生しました。";
+      });
+    }
+
+    // 予約フォームの送信
+    reservationForm.addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      reserveButton.disabled = true;
+      reserveButton.textContent = '予約中...';
+
+      var people = document.getElementById('people').value;
+
+      fetch(gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=reserve&people=' + encodeURIComponent(people)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          localStorage.setItem('reservationNumber', data.reservationNumber);
+
+          resultDiv.innerHTML = `✅ 予約が完了しました。<br>あなたの予約番号は <strong>${data.reservationNumber}</strong> です。`;
+          resultDiv.style.display = 'block';
+          getWaitTime();
+          reservationForm.style.display = 'none';
+        } else {
+          resultDiv.innerHTML = `❌ 予約に失敗しました。`;
+          resultDiv.style.display = 'block';
+          reserveButton.disabled = false;
+          reserveButton.textContent = '予約する';
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        resultDiv.innerHTML = `❌ 予約中にエラーが発生しました。`;
+        resultDiv.style.display = 'block';
+        reserveButton.disabled = false;
+        reserveButton.textContent = '予約する';
+      });
+    });
+  </script>
+</body>
+</html>
